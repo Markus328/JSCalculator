@@ -1,57 +1,83 @@
 window.addEventListener("load", init)
-let buttons, display, cls, equals, numbers, operators, decimal;
+let display, cls, equals, decimal;
 
+//The string showing up on display can differ from the calculation string
+//per example the decimal, multiply, divide can differ depending of the style or region
 
-let operatorsObj = { "add": '', "subtract": '', "multiply": '', "divide": '' };
-let operatorsObjValues = [];
-const methods = [sum, sum, multiply, divide];
-let operatorsLen = 0;
+//buttons is a map for the string on display (the same characters of buttons)
+let buttons;
+
+//numberMap maps the button id to its calculation value
+const numberMap = {
+  zero: "0",
+  one: "1",
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  nine: "9",
+  decimal: "."
+};
+//operatorMap maps the button id to its calculation value
+//DO NOT change this since it'll break the stuff, literal values of
+//this are used to improve the consiceness
+const operatorMap = {
+  add: "+",
+  subtract: "-",
+  multiply: "*",
+  divide: "/",
+  // exponent: "^",
+  // radical: "√"
+}
+
+//Arithmetic functions that will be chosen through the indexing techiniques
+const operatorDef = {
+  "+": [addition, 1],  //function to call and the priority
+  "-": [subtraction, 1],
+  "*": [multiplication, 2],
+  "/": [division, 2],
+  // "^": [exponentiation, 3],
+  // "√": [radication, 3],
+}
+
+const buttonMap = { ...numberMap, ...operatorMap };
 
 //total is calculated every time the user inputs an operator
 let total = 0;
+
 //stringBuffer only stores one float (including a negative one) as string.
-let stringBuffer = "0";
-//buffer stores up to 4 elements at once: number operator1 number operator2
+let stringBuffer = '';
+
+//buffer stores elements like floats and operators to be used in the calculation
 let buffer = [];
 
 function init() {
   display = document.querySelector(".display");
   cls = document.querySelector("#clear");
   equals = document.querySelector("#equals");
-  buttons = document.querySelectorAll(".button");
-  numbers = document.querySelectorAll(".number");
-  operators = document.querySelectorAll(".operator");
+  const numbers_ = document.querySelectorAll(".number");
+  const operators_ = document.querySelectorAll(".operator");
   decimal = document.querySelector("#decimal")
   cls.addEventListener("click", clear);
   equals.addEventListener("click", showResult)
-  numbers.forEach(button => {
+
+  buttons = Object.assign(Object.assign({}, numberMap), operatorMap);
+  numbers_.forEach(button => {
+    buttons[button.id] = button.innerText;
     button.addEventListener("click", function() {
       handleNumber(button);
     });
   })
-  operators.forEach(button => {
-    switch (button.id) {
-      case 'add':
-        operatorsObj["add"] = button.innerText;
-        break;
-      case 'subtract':
-        operatorsObj["subtract"] = button.innerText;
-        break;
-      case 'multiply':
-        operatorsObj["multiply"] = button.innerText;
-        break;
-      case 'divide':
-        operatorsObj["divide"] = button.innerText;
-        break;
+  operators_.forEach(button => {
+    buttons[button.id] = button.innerText;
 
-    }
     button.addEventListener("click", function() {
       handleOperator(button);
     });
   })
-
-  operatorsObjValues = Object.values(operatorsObj);
-  operatorsLen = operatorsObjValues.length;
   clear();
 
 }
@@ -59,109 +85,121 @@ function init() {
 
 function clear() {
   display.innerText = '0';
-  stringBuffer = display.innerText;
+  stringBuffer = '';
   setTotal(0);
-  // console.log(buffer);
 }
 
 function strPut(text, sym) {
-  if (text == null)
-    text = '0';
-  if (text == '0') {
-    if (sym != decimal.innerText) {
-      text = sym;
-      return text;
-    }
+  text = text == '' ? '0' : text;
+  if (text == '0' && sym != decimal.innerText) {
+    return sym;
   }
-  text += sym;
-
-  return text;
+  return text + sym;
 
 }
 
 function setTotal(value) {
-  buffer = [value, operatorsObj['add']]
+  buffer = [];
   total = value;
+  stringBuffer = value.toString();
 }
 
 function handleNumber(button) {
-  let num = button.innerText;
-  if (button == decimal && stringBuffer.indexOf(decimal.innerText) != -1) {
+  //get the number for calculation
+  const num = numberMap[button.id]
+  if (button == decimal && stringBuffer.includes(num)) {
     return
   }
-  display.innerText = strPut(display.innerText, num);
+  display.innerText = strPut(display.innerText, showOnDisplay(num));
   stringBuffer = strPut(stringBuffer, num);
 }
 function handleOperator(button) {
-  let op = button.innerText;
-  if (stringBuffer == '0' && operatorsObjValues.indexOf(display.innerText[display.innerText.length - 1]) != -1)
-    return;
+  //get the operator for calculation
+  const op = operatorMap[button.id];
+
+  //let it changes operator
+  if (stringBuffer == '')
+    display.innerText = display.innerText.slice(0, -1);
+
   pushOperation(op);
-  display.innerText = strPut(display.innerText, op);
+  display.innerText = strPut(display.innerText, showOnDisplay(op));
 }
 
 function pushOperation(op) {
-  if (stringBuffer == '0') {
+  //change operator
+  if (stringBuffer == '') {
     buffer[buffer.length - 1] = op;
     return;
   }
-  if (last(buffer) == operatorsObj['subtract']) {
-    buffer[buffer.length - 1] = operatorsObj['add'];
-    stringBuffer = '-' + stringBuffer;
-  }
+
   buffer.push(parseFloat(stringBuffer));
   buffer.push(op);
   buffer = resolve(buffer);
   total = buffer[0];
-  console.log("total =" + total)
-  stringBuffer = '0';
+  stringBuffer = '';
+
 }
 
 function resolve(buf) {
-  console.log(buf)
+  if (buf.length < 4)
+    return buf;
   if (buf.length > 4) {
-    console.log(buf.slice(0, 2))
+    //splits the buf into two and resolve the last part
     buf = buf.slice(0, 2).concat(resolve(buf.slice(2)))
-    console.log("recall: " + buf);
   }
   const num1 = buf[0];
   const op1 = buf[1];
   const num2 = buf[2];
-  const op2 = last(buf);
-  if (operatorsObjValues.indexOf(op1) <= 1 && operatorsObjValues.indexOf(op2) > 1)
+  const op2 = buf[3];
+
+  const op1Def = operatorDef[op1];
+  const op2Def = operatorDef[op2];
+
+  //rule for it doesn't resolve an operation before another with higher priority
+  if (op1Def[1] < op2Def[1])
     return buf;
-  const index = operatorsObjValues.indexOf(op1);
-  if (index == -1)
-    return buf;
-  let result = methods[index](num1, num2);
+
+  const result = op1Def[0](num1, num2);
   buf = [result, op2];
   return buf;
 
+}
 
+function showOnDisplay(string) {
+  for (let btn of Object.entries(buttonMap)) {
+    string = string.replaceAll(btn[1], buttons[btn[0]]);
+  }
+  return string;
 }
 
 function showResult() {
-  pushOperation(operatorsObj['add'])
+  //pushes any operation to calculate total
+  pushOperation(operatorMap['add']);
   setTotal(total);
-  display.innerText = total;
+
+  //prepares the total to display on screen
+  //using the defined symbols in the HTML
+  display.innerText = showOnDisplay(total.toString())
 }
 
-function last(list) {
-  return list[list.length - 1];
-}
 
-
-function sum(num1, num2) {
+function addition(num1, num2) {
   return num1 + num2;
 }
-function multiply(num1, num2) {
+function subtraction(num1, num2) {
+  return addition(num1, -num2);
+}
+function multiplication(num1, num2) {
   return num1 * num2;
 }
-function divide(num1, num2) {
+function division(num1, num2) {
   if (num2 == 0)
     return num1;
   return num1 / num2;
 }
-
-
-
+// function exponentiation(num1, num2) {
+//   return Math.pow(num1, num2);
+// }
+// function radication(num1, num2) {
+//   return Math.pow(num2, division(1, num1));
+// }
